@@ -1,21 +1,37 @@
 import { useQuery, useQueryClient } from "react-query";
 
+type Get = () => unknown;
+type Setter<S> = (v: S | ((prev?: S, get?: Get) => S)) => void;
+type EdgeState<S> = [S, Setter<S>];
+
 /**
- * @description internal useCreateState
+ * @description internal UseQueryOptions
  */
-function useCreateState(stateKey: string, initialState: any) {
-  return useQuery([stateKey], () => initialState, {
-    initialData: initialState,
-    refetchOnWindowFocus: false,
-    cacheTime: 0,
-    keepPreviousData: true,
-    refetchOnReconnect: false,
-    suspense: false,
-  });
+const options = (initialData: any) => ({
+  initialData,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false,
+  keepPreviousData: true,
+  cacheTime: 0,
+  suspense: false,
+});
+
+/**
+ * @description internal useGetContext
+ */
+function useGetContext<T extends string, S>(stateKey: T, initialState: S) {
+  return useQuery([stateKey], options(initialState));
 }
 
 /**
- * @description internal useSetter hook
+ * @description internal useCreateState
+ */
+function useCreateState<T extends string, S>(stateKey: T, initialState: S) {
+  return useQuery([stateKey], () => initialState, options(initialState));
+}
+
+/**
+ * @description internal useSetter
  */
 function useSetter<T extends string, S>(stateKey: T, data: S) {
   const queryClient = useQueryClient();
@@ -41,23 +57,23 @@ function useSetter<T extends string, S>(stateKey: T, data: S) {
 export function useEdgeState<T extends string, S>(
   stateKey: T,
   initialState: S
-) {
-  const { data } = useCreateState(stateKey, initialState);
-  const setter = useSetter(stateKey, data);
+): EdgeState<S> {
+  const state = useCreateState(stateKey, initialState);
+  const setter = useSetter(stateKey, state.data);
 
-  return [data || initialState, setter];
+  return [state.data || initialState, setter];
 }
 
 /**
  * Edge Context
- * @description read/write an existing state created by useCreateCloudState
+ * @description read/write an existing state created by useEdgeContext
  */
 export function useEdgeContext<T extends string, S>(
   stateKey: T,
   initialState: S
-) {
-  const { data } = useCreateState(stateKey, initialState);
-  const setter = useSetter(stateKey, data);
+): EdgeState<S> {
+  const context = useGetContext(stateKey, initialState);
+  const setter = useSetter(stateKey, context.data);
 
-  return [data || initialState, setter] as const;
+  return [context.data || initialState, setter];
 }
